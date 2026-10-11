@@ -71,6 +71,7 @@ namespace MetalQuestLink.Editor
             settings.maxPendingFrames = EditorGUILayout.IntSlider(
                 "Max pending frames", settings.maxPendingFrames, 1, 8);
             settings.autoStartQuestClient = EditorGUILayout.Toggle("Start client on Play", settings.autoStartQuestClient);
+            settings.autoLoadRoomSnapshot = EditorGUILayout.Toggle("Load saved room on Play (Mac)", settings.autoLoadRoomSnapshot);
             settings.autoConfigureStandaloneOpenXR = EditorGUILayout.Toggle(
                 "Configure Standalone OpenXR", settings.autoConfigureStandaloneOpenXR);
             settings.enablePassthroughPreview = EditorGUILayout.Toggle(
@@ -114,6 +115,14 @@ namespace MetalQuestLink.Editor
                 RunAdb(AdbBridge.StartClient);
             }
 
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Quest room snapshot", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(RoomSnapshotBridge.Status, MessageType.Info);
+            using (new EditorGUI.DisabledScope(RoomSnapshotBridge.IsBusy))
+            {
+                if (GUILayout.Button("Sync scanned Quest room to MRUK"))
+                    RoomSnapshotBridge.SyncRoom();
+            }
             EditorGUILayout.Space();
             EditorGUILayout.HelpBox(lastResult,
                 preflight.IsReady ? MessageType.Info : MessageType.Error);

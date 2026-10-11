@@ -2,7 +2,7 @@
 
 ## 実装済み
 
-### 共有プロトコル v1
+### 共有プロトコル v2（ローカルcontroller-pose修正版）
 
 - TCPストリーム上で使う、長さプレフィックス付きのlittle-endianバイナリ形式。
 - wire magicはlittle-endian `MTLK`（`0x4b4c544d`）。旧releaseとは接続互換性を持たない。
@@ -10,7 +10,7 @@
 - payloadの最大長は64 MiB。magic、version、message type、宣言長、メッセージ固有の可変長データをデシリアライズ時に検証する。
 - message type:
   - VideoFrame: host monotonic capture timestamp、左右眼それぞれのrender pose/FOV、画面寸法、codec、eye count、flags、エンコード済み映像
-  - PoseInput: sample timestamp、HMD pose、左右コントローラpose、buttons、thumbstick、trigger、grip
+  - PoseInput: sample timestamp、HMD pose、左右コントローラのgrip pose / aim pose、buttons、thumbstick、trigger、grip。payloadは216 bytes。
   - Control: kind、flags、timestamp、拡張用データ
   - HapticCommand: host timestamp、左右、apply/stop、振幅、周波数、持続時間
   - HandTrackingInput: sample timestamp、左右active、各26関節のpose/radius/valid/tracked flags
@@ -37,6 +37,9 @@
 - `scripts/test_phase2.sh` は未接続60-frame pass-throughと、接続240-frame producer / 120-frame decoderの両方を検証する。
 
 ### pose・入力注入
+
+- Local controller-pose patch: `devicePosition` / `deviceRotation` supply grip, and `PointerPosition` / `PointerRotation` supply aim. Each hand is sampled independently. OpenXR action spaces select the matching pose from the action binding, preserving `poseInActionSpace`. Missing aim data remains invalid instead of using grip as a substitute.
+- Wire protocol v2 adds one 32-byte aim pose per controller after its existing grip pose. All message headers use v2; mismatched v1 peers are rejected. Install the patched Mac package and Quest APK together.
 
 - transportは単一TCP connectionを全二重で使い、Mac→clientのVideoFrameとclient→MacのPoseInputを同時に処理する。OpenXR instance破棄時にlistenerを停止・joinし、layer unload後にthreadを残さない。listener / accepted socketにはclose-on-execを設定し、layer processが起動したadbなどの子孫processへsocketを継承させない。
 - 最後に受信したPoseInputを各hookが参照する。接続切断時、またはローカル受信から500 ms経過したstale入力ではruntime結果を変更しない。

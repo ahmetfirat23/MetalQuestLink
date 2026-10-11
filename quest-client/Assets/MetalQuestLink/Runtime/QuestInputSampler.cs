@@ -13,33 +13,41 @@ namespace MetalQuestLink.QuestClient
         private static readonly InputFeatureUsage<bool> SecondaryTouch = new InputFeatureUsage<bool>("SecondaryTouch");
         private static readonly InputFeatureUsage<bool> ThumbstickTouch = new InputFeatureUsage<bool>("Thumbrest");
         private static readonly InputFeatureUsage<bool> TriggerTouch = new InputFeatureUsage<bool>("IndexTouch");
+        private static readonly InputFeatureUsage<Vector3> PointerPosition = new InputFeatureUsage<Vector3>("PointerPosition");
+        private static readonly InputFeatureUsage<Quaternion> PointerRotation = new InputFeatureUsage<Quaternion>("PointerRotation");
         private static readonly double NanosecondsPerTick = 1_000_000_000.0 / Stopwatch.Frequency;
 
         public static PoseInput Sample()
         {
-            return new PoseInput
+            var sample = new PoseInput
             {
                 SampleTimestampNs = unchecked((ulong)(Stopwatch.GetTimestamp() * NanosecondsPerTick)),
                 Head = SamplePose(InputDeviceCharacteristics.HeadMounted),
                 Left = SampleController(InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller),
                 Right = SampleController(InputDeviceCharacteristics.Right | InputDeviceCharacteristics.Controller),
             };
+            ImmersiveProjectionFeature.TryGetDeviceViews(sample.DeviceViews);
+            return sample;
         }
 
         private static PoseState SamplePose(InputDeviceCharacteristics characteristics)
         {
-            var device = FindDevice(characteristics);
+            return SamplePose(FindDevice(characteristics), false);
+        }
+
+        private static PoseState SamplePose(InputDevice device, bool aim)
+        {
             var result = new PoseState { Orientation = new Quaternionf { W = 1.0f } };
             if (!device.isValid)
             {
                 return result;
             }
-            if (device.TryGetFeatureValue(CommonUsages.devicePosition, out var position))
+            if (device.TryGetFeatureValue(aim ? PointerPosition : CommonUsages.devicePosition, out var position))
             {
                 result.Position = ToOpenXr(position);
                 result.Flags |= PoseFlags.PositionValid | PoseFlags.PositionTracked;
             }
-            if (device.TryGetFeatureValue(CommonUsages.deviceRotation, out var rotation))
+            if (device.TryGetFeatureValue(aim ? PointerRotation : CommonUsages.deviceRotation, out var rotation))
             {
                 result.Orientation = ToOpenXr(rotation);
                 result.Flags |= PoseFlags.OrientationValid | PoseFlags.OrientationTracked;
@@ -52,7 +60,8 @@ namespace MetalQuestLink.QuestClient
             var device = FindDevice(characteristics);
             var state = new ControllerState
             {
-                Pose = SamplePose(characteristics),
+                Pose = SamplePose(device, false),
+                AimPose = SamplePose(device, true),
             };
             if (!device.isValid)
             {

@@ -50,7 +50,7 @@ namespace MetalQuestLink.QuestClient.Editor
         {
             PlayerSettings.companyName = "MetalQuestLink";
             PlayerSettings.productName = "MetalQuestLink";
-            PlayerSettings.bundleVersion = "0.2.0";
+            PlayerSettings.bundleVersion = "0.2.3-eye-views.1";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.metalquestlink.questclient");
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
@@ -166,6 +166,7 @@ namespace MetalQuestLink.QuestClient.Editor
             {
                 throw new InvalidOperationException("OVRProjectConfig could not be loaded");
             }
+            SetEnumField(config, configType, "sceneSupport", "Supported");
             SetEnumField(config, configType, "handTrackingSupport", "ControllersAndHands");
             SetEnumField(config, configType, "handTrackingFrequency", "HIGH");
             SetEnumProperty(config, configType, "insightPassthroughSupport", "Supported");
@@ -211,6 +212,7 @@ namespace MetalQuestLink.QuestClient.Editor
             screen.transform.SetParent(client.transform, false);
             var presenter = screen.AddComponent<ExternalSurfacePresenter>();
             var controller = client.AddComponent<QuestClientController>();
+            client.AddComponent<QuestRoomExporter>();
             var serializedController = new SerializedObject(controller);
             var presenterProperty = serializedController.FindProperty("presenter");
             if (presenterProperty == null)
@@ -255,6 +257,33 @@ namespace MetalQuestLink.QuestClient.Editor
                 }
             }
             return null;
+        }
+    }
+
+    // Meta's optional AI debugger is unrelated to this client. Its SDK build callback
+    // injects an Editor access token, so clear that after SDK preprocessing.
+    internal sealed class RoomClientBuildSettings : IPreprocessBuildWithReport
+    {
+        public int callbackOrder => 10000;
+
+        public void OnPreprocessBuild(BuildReport report)
+        {
+            const string name = "Meta.XR.ImmersiveDebugger.DevAgent.RuntimeSettings";
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(name, false);
+                if (type == null) continue;
+                var settings = type.GetProperty("Instance", BindingFlags.NonPublic | BindingFlags.Static)
+                    ?.GetValue(null) as UnityEngine.Object;
+                if (settings == null) return;
+                var serialized = new SerializedObject(settings);
+                serialized.FindProperty("enabled").boolValue = false;
+                serialized.FindProperty("accessToken").stringValue = "";
+                serialized.FindProperty("serverAddress").stringValue = "";
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                AssetDatabase.SaveAssets();
+                return;
+            }
         }
     }
 }

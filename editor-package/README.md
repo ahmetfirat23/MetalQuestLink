@@ -1,14 +1,9 @@
 # MetalQuestLink Editor
 
-A self-contained Unity package for streaming Editor Play Mode to Meta Quest 3 / 3S. It includes a
-prebuilt Apple Silicon OpenXR API layer and Quest APK; end users do not need CMake or Xcode.
+The local `0.2.3-eye-views.1` patch includes separate controller grip/aim poses, real Quest eye poses and viewing angles, and the Mac projection-space correction. It uses protocol v3; install the bundled matching Quest client.
 
-Unity 2022.3 LTS is the resolver baseline. Package compatibility is verified on Unity 6000.2 and
-6000.3; the 2022.3 local matrix still requires a licensed Editor in the verification environment.
-Projects using newer XR Plug-in Management or OpenXR packages keep their compatible versions.
+MRUK 203.0.0 is optional in the Editor project. For scanned-room preview, follow [room setup](Documentation~/room-sync.md). Mac Play mode reuses a room snapshot only in the matching Quest client session; otherwise it syncs automatically. Windows and player builds skip the Mac overrides.
 
-After installation, open **Window > MetalQuestLink**, click **Quick Setup (Project + Quest)**, and
-press Play. The package registers its implicit OpenXR layer manifest when loaded.
+Native tests and Unity compilation passed. Controller and room alignment were checked on Quest 3, including automatic sync and cached loading after restarting Play. Some movement delay remains in the streamed preview. Windows Quest Link has not been physically tested here.
 
-See the repository [README](../README.md) for prerequisites, Meta XR Simulator setup, Gatekeeper
-guidance, diagnostics, limitations, and the Japanese documentation link.
+See the root [README](../README.md) for prerequisites and installation.

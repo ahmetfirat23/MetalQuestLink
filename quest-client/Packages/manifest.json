@@ -9,13 +9,18 @@
     }
   ],
   "dependencies": {
+    "com.meta.xr.mrutilitykit": "203.0.0",
     "com.meta.xr.sdk.core": "203.0.0",
+    "com.metalquestlink.editor": "file:../../editor-package",
     "com.unity.test-framework": "1.6.0",
+    "com.unity.xr.meta-openxr": "2.5.1",
+    "com.unity.xr.openxr": "1.16.1",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",
     "com.unity.modules.assetbundle": "1.0.0",
-    "com.unity.modules.physics2d": "1.0.0",
-    "com.unity.xr.meta-openxr": "2.5.1",
-    "com.unity.xr.openxr": "1.15.1"
-  }
+    "com.unity.modules.physics2d": "1.0.0"
+  },
+  "testables": [
+    "com.metalquestlink.editor"
+  ]
 }

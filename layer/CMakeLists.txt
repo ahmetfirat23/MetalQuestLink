@@ -26,6 +26,14 @@ if(BUILD_TESTING)
 endif()
 
 if(METALQUESTLINK_BUILD_OPENXR)
+  if(BUILD_TESTING)
+    add_executable(metalquestlink_input_tests tests/input_injection_tests.cpp)
+    target_compile_features(metalquestlink_input_tests PRIVATE cxx_std_20)
+    target_link_libraries(metalquestlink_input_tests PRIVATE OpenXR::headers MetalQuestLink::Protocol)
+    target_compile_options(metalquestlink_input_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    add_test(NAME controller_poses COMMAND metalquestlink_input_tests)
+  endif()
+
   add_library(metalquestlink_openxr_layer MODULE
     src/input_injection.cpp
     src/openxr_layer.cpp

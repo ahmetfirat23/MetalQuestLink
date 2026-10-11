@@ -16,14 +16,19 @@ namespace MetalQuestLink.QuestClient.Tests
             var pose = CreatePoseInput();
             var bytes = Protocol.Serialize(new WireMessage(0x0102030405060708ul, pose));
 
-            Assert.That(bytes.Length, Is.EqualTo(Protocol.HeaderSize + 152));
+            pose.DeviceViews[0].Pose.Position.X = -0.031f;
+            pose.DeviceViews[1].Pose.Position.X = 0.034f;
+            pose.DeviceViews[0].Fov.AngleLeft = -0.9f;
+            bytes = Protocol.Serialize(new WireMessage(0x0102030405060708ul, pose));
+            Assert.That(bytes.Length, Is.EqualTo(Protocol.HeaderSize + 312));
             Assert.That(bytes[0], Is.EqualTo(0x4d));
             Assert.That(bytes[1], Is.EqualTo(0x54));
             Assert.That(bytes[2], Is.EqualTo(0x4c));
             Assert.That(bytes[3], Is.EqualTo(0x4b));
-            Assert.That(bytes[4], Is.EqualTo(1));
+            Assert.That(bytes[4], Is.EqualTo(3));
             Assert.That(bytes[6], Is.EqualTo((byte)MessageType.PoseInput));
-            Assert.That(bytes[8], Is.EqualTo(152));
+            Assert.That(bytes[8], Is.EqualTo(56));
+            Assert.That(bytes[9], Is.EqualTo(1));
 
             var decoded = Protocol.Deserialize(bytes);
             var value = decoded.Payload as PoseInput;
@@ -35,6 +40,11 @@ namespace MetalQuestLink.QuestClient.Tests
                 Is.EqualTo(ControllerButtons.PrimaryButton | ControllerButtons.TriggerTouch));
             Assert.That(value.Right.Thumbstick.Y, Is.EqualTo(-0.75f));
             Assert.That(value.Right.Grip, Is.EqualTo(0.875f));
+            Assert.That(value.Left.AimPose.Orientation.X, Is.EqualTo(0.25f));
+            Assert.That(value.Right.AimPose.Orientation.Y, Is.EqualTo(-0.5f));
+            Assert.That(value.DeviceViews[0].Pose.Position.X, Is.EqualTo(-0.031f));
+            Assert.That(value.DeviceViews[1].Pose.Position.X, Is.EqualTo(0.034f));
+            Assert.That(value.DeviceViews[0].Fov.AngleLeft, Is.EqualTo(-0.9f));
         }
 
         [Test]
@@ -187,6 +197,9 @@ namespace MetalQuestLink.QuestClient.Tests
         public void InvalidMessagesAreRejected()
         {
             var valid = Protocol.Serialize(new WireMessage(1, CreatePoseInput()));
+            var legacy = (byte[])valid.Clone();
+            legacy[4] = 1;
+            Assert.Throws<ProtocolException>(() => Protocol.Deserialize(legacy));
             valid[0] = 0;
             Assert.Throws<ProtocolException>(() => Protocol.Deserialize(valid));
             Assert.Throws<ProtocolException>(() => Protocol.Deserialize(new byte[5]));
@@ -315,6 +328,7 @@ namespace MetalQuestLink.QuestClient.Tests
                 Left = new ControllerState
                 {
                     Pose = new PoseState { Orientation = new Quaternionf { W = 1 } },
+                    AimPose = new PoseState { Orientation = new Quaternionf { X = 0.25f, W = 0.9682458f } },
                     Buttons = ControllerButtons.PrimaryButton | ControllerButtons.TriggerTouch,
                     Thumbstick = new Vector2f { X = 0.25f, Y = 0.5f },
                     Trigger = 0.625f,
@@ -323,6 +337,7 @@ namespace MetalQuestLink.QuestClient.Tests
                 Right = new ControllerState
                 {
                     Pose = new PoseState { Orientation = new Quaternionf { W = 1 } },
+                    AimPose = new PoseState { Orientation = new Quaternionf { Y = -0.5f, W = 0.8660254f } },
                     Buttons = ControllerButtons.MenuButton,
                     Thumbstick = new Vector2f { X = -0.5f, Y = -0.75f },
                     Trigger = 0.8125f,

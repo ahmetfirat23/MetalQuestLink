@@ -37,6 +37,20 @@ ProjectionState g_state;
 PFN_xrGetInstanceProcAddr g_next_gipa{};
 PFN_xrEndFrame g_next_end_frame{};
 PFN_xrDestroySwapchain g_destroy_swapchain{};
+PFN_xrWaitFrame g_next_wait_frame{};
+XrTime g_display_time{};
+
+XrResult XRAPI_PTR hook_wait_frame(XrSession session, const XrFrameWaitInfo* info,
+                                  XrFrameState* state) {
+  const auto next = g_next_wait_frame;
+  if (next == nullptr) return XR_ERROR_FUNCTION_UNSUPPORTED;
+  const auto result = next(session, info, state);
+  if (XR_SUCCEEDED(result) && state != nullptr) {
+    std::scoped_lock lock(g_mutex);
+    g_display_time = state->predictedDisplayTime;
+  }
+  return result;
+}
 
 void log_line(const char* message) {
   __android_log_print(ANDROID_LOG_INFO, kLogTag, "%s", message);
@@ -121,6 +135,12 @@ XrResult XRAPI_PTR hook_get_instance_proc_addr(XrInstance instance, const char* 
   if (g_next_gipa == nullptr) return XR_ERROR_INITIALIZATION_FAILED;
   const XrResult result = g_next_gipa(instance, name, function);
   if (XR_SUCCEEDED(result) && function != nullptr && name != nullptr &&
+      std::strcmp(name, "xrWaitFrame") == 0) {
+    if (*function != reinterpret_cast<PFN_xrVoidFunction>(hook_wait_frame))
+      g_next_wait_frame = reinterpret_cast<PFN_xrWaitFrame>(*function);
+    *function = reinterpret_cast<PFN_xrVoidFunction>(hook_wait_frame);
+  }
+  if (XR_SUCCEEDED(result) && function != nullptr && name != nullptr &&
       std::strcmp(name, "xrEndFrame") == 0) {
     std::scoped_lock lock(g_mutex);
     if (*function != reinterpret_cast<PFN_xrVoidFunction>(hook_end_frame)) {
@@ -151,6 +171,32 @@ void destroy_surface_swapchain_locked() {
 
 }  // namespace
 
+// Query the device runtime in the same reference space used to submit the stream.
+extern "C" __attribute__((visibility("default"))) std::uint32_t
+metalquestlink_projection_get_device_views(StreamView* output, std::uint32_t capacity) {
+  if (output == nullptr || capacity < 2) return 0;
+  std::scoped_lock lock(g_mutex);
+  if (g_state.session == XR_NULL_HANDLE || g_state.app_space == XR_NULL_HANDLE ||
+      g_display_time == 0) return 0;
+  const auto locate = load_function<PFN_xrLocateViews>(g_state.instance, "xrLocateViews");
+  if (locate == nullptr) return 0;
+  XrViewLocateInfo info{};
+  info.type = XR_TYPE_VIEW_LOCATE_INFO;
+  info.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+  info.displayTime = g_display_time;
+  info.space = g_state.app_space;
+  XrViewState state{};
+  state.type = XR_TYPE_VIEW_STATE;
+  std::array<XrView, 2> views{};
+  for (auto& view : views) view.type = XR_TYPE_VIEW;
+  std::uint32_t count{};
+  if (XR_FAILED(locate(g_state.session, &info, &state, 2, &count, views.data())) || count != 2)
+    return 0;
+  for (std::size_t eye = 0; eye < 2; ++eye)
+    output[eye] = {.pose = views[eye].pose, .fov = views[eye].fov};
+  return static_cast<std::uint32_t>(state.viewStateFlags);
+}
+
 extern "C" __attribute__((visibility("default"))) PFN_xrGetInstanceProcAddr
 metalquestlink_projection_hook_get_instance_proc_addr(PFN_xrGetInstanceProcAddr old) {
   std::scoped_lock lock(g_mutex);
@@ -171,6 +217,7 @@ extern "C" __attribute__((visibility("default"))) void metalquestlink_projection
     XrSession session) {
   std::scoped_lock lock(g_mutex);
   g_state.session = session;
+  g_display_time = 0;
   log_line("received OpenXR session");
 }
 
@@ -239,4 +286,5 @@ extern "C" __attribute__((visibility("default"))) void metalquestlink_projection
   destroy_surface_swapchain_locked();
   g_state.session = XR_NULL_HANDLE;
   g_state.app_space = XR_NULL_HANDLE;
+  g_display_time = 0;
 }

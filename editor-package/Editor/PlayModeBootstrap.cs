@@ -15,6 +15,7 @@ namespace MetalQuestLink.Editor
 
         private static void RegisterLayerOnLoad()
         {
+            if (Application.platform != RuntimePlatform.OSXEditor) return;
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 return;
@@ -36,6 +37,12 @@ namespace MetalQuestLink.Editor
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
+            if (Application.platform != RuntimePlatform.OSXEditor) return;
+            if (state == PlayModeStateChange.EnteredPlayMode)
+            {
+                RoomSnapshotBridge.LoadRoomOnPlay();
+                return;
+            }
             if (state != PlayModeStateChange.ExitingEditMode)
             {
                 return;

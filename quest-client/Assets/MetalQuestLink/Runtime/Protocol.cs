@@ -102,7 +102,8 @@ namespace MetalQuestLink.QuestClient
 
     public struct ControllerState
     {
-        public PoseState Pose;
+        public PoseState Pose; // OpenXR grip pose.
+        public PoseState AimPose;
         public ControllerButtons Buttons;
         public Vector2f Thumbstick;
         public float Trigger;
@@ -143,6 +144,7 @@ namespace MetalQuestLink.QuestClient
         public PoseState Head;
         public ControllerState Left;
         public ControllerState Right;
+        public EyeView[] DeviceViews = new EyeView[2];
     }
 
     public sealed class ControlMessage
@@ -208,7 +210,7 @@ namespace MetalQuestLink.QuestClient
     public static class Protocol
     {
         public const uint Magic = 0x4b4c544d;
-        public const ushort Version = 1;
+        public const ushort Version = 3;
         public const int HeaderSize = 20;
         public const float PassthroughApproximationAlpha = 0.82f;
         public const uint MaxPayloadSize = 64u * 1024u * 1024u;
@@ -365,11 +367,14 @@ namespace MetalQuestLink.QuestClient
 
         private static byte[] SerializePoseInput(PoseInput value)
         {
-            var writer = new WireWriter(152);
+            var writer = new WireWriter(312);
             writer.Write(value.SampleTimestampNs);
             WritePose(writer, value.Head);
             WriteController(writer, value.Left);
             WriteController(writer, value.Right);
+            if (value.DeviceViews == null || value.DeviceViews.Length != 2)
+                throw new ArgumentException("Pose input requires two device eye views.");
+            foreach (var view in value.DeviceViews) WriteEyeView(writer, view);
             return writer.ToArray();
         }
 
@@ -437,6 +442,7 @@ namespace MetalQuestLink.QuestClient
                 Head = ReadPose(reader),
                 Left = ReadController(reader),
                 Right = ReadController(reader),
+                DeviceViews = new[] { ReadEyeView(reader), ReadEyeView(reader) },
             };
         }
 
@@ -528,6 +534,7 @@ namespace MetalQuestLink.QuestClient
         private static void WriteController(WireWriter writer, ControllerState value)
         {
             WritePose(writer, value.Pose);
+            WritePose(writer, value.AimPose);
             writer.Write((ulong)value.Buttons);
             writer.Write(value.Thumbstick.X);
             writer.Write(value.Thumbstick.Y);
@@ -540,6 +547,7 @@ namespace MetalQuestLink.QuestClient
             return new ControllerState
             {
                 Pose = ReadPose(reader),
+                AimPose = ReadPose(reader),
                 Buttons = (ControllerButtons)reader.ReadUInt64(),
                 Thumbstick = new Vector2f { X = reader.ReadSingle(), Y = reader.ReadSingle() },
                 Trigger = reader.ReadSingle(),

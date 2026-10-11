@@ -1,5 +1,19 @@
 # MetalQuestLink
 
+## Fixes in this fork
+
+- **Controller orientation:** forward each controller’s real grip and aim poses separately. No manual angle adjustment is needed.
+- **Stereo alignment:** use the Quest’s actual eye positions and viewing angles instead of fixed 64 mm eye spacing and simulator values.
+- **Projection coordinates:** convert Unity’s submitted view poses into the Quest tracking coordinate system before streaming.
+- **Scanned rooms:** export MRUK room geometry and labels from Quest and import them into the Mac Editor over USB.
+- **Automatic room loading:** load the saved room when Play starts. Refresh automatically when the Quest client session changes. Wait for the live connection and clear the previous room before importing.
+- **Cache alignment:** stop reusing room coordinates from an older client session, which could make surfaces too high or rotated.
+- **Platform separation:** apply the snapshot override only in the Mac Editor. Windows and Quest builds keep normal MRUK device loading.
+
+Controller alignment and desk alignment were checked on Quest 3. Both automatic room sync and cached loading after restarting Play passed. The streamed preview still has some movement delay; Windows Quest Link has not been tested here.
+
+Use the matching `0.2.3-eye-views.1` package and Quest client together (protocol v3). Read [room setup](docs/mruk-room-sync.md) for the Mac setup and cache refresh steps.
+
 [日本語](README.ja.md) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) · [Apache-2.0](LICENSE)
 
@@ -129,7 +143,8 @@ movement after reception.
 | Hand tracking | Supported | `XR_EXT_hand_tracking`, 26 joints per hand; 52 active joints verified on Quest 3 |
 | Controller haptics | Supported path | Apply/stop commands are transported; physical vibration feel still needs validation |
 | Passthrough | Approximation | Passthrough underlay plus uniform video alpha `0.82`; per-pixel alpha is not preserved |
-| Scene anchors / spatial mesh | Not supported | Outside protocol v1 scope |
+| MRUK scanned room snapshot | Local experimental bridge | Explicit USB export/import; see [room sync](docs/mruk-room-sync.md) |
+| Live scene anchors / spatial mesh API | Not forwarded | MRUK snapshots do not implement OpenXR scene or anchor APIs |
 | Eye / face tracking | Not supported | Quest 3 / 3S are the current targets |
 
 ## Diagnostics
@@ -195,7 +210,8 @@ performance guarantees.
 - Unity 2022.3 satisfies the package baseline but is not yet in the locally verified matrix.
 - Passthrough uses a uniform-alpha approximation and does not retain per-pixel alpha.
 - Dynamic eye-texture resolution or codec changes during Play are not supported.
-- Controller grip and aim share the protocol v1 pose, and injected IPD is currently fixed at 64 mm.
+- This local controller-pose patch forwards separate tracked grip and aim poses. It uses protocol v3: install the matching patched Mac package and Quest APK together. Older protocol versions are rejected.
+- Eye poses and viewing angles come from the Quest runtime. See [eye-view fixes](docs/eye-views-fix.md).
 - The latency clock offset assumes approximately symmetric Ping/Pong transport time.
 - Metal is the only supported host graphics API.
 

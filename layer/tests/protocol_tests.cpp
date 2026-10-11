@@ -72,6 +72,7 @@ void test_video_round_trip() {
 void test_pose_input_round_trip() {
   const protocol::ControllerState left{
       .pose = pose(10.0F),
+      .aim_pose = pose(11.0F),
       .buttons = 0xa5,
       .thumbstick = {-0.25F, 0.75F},
       .trigger = 0.5F,
@@ -79,6 +80,7 @@ void test_pose_input_round_trip() {
   };
   const protocol::ControllerState right{
       .pose = pose(20.0F),
+      .aim_pose = pose(21.0F),
       .buttons = 0x5a,
       .thumbstick = {1.0F, -1.0F},
       .trigger = 0.25F,
@@ -91,10 +93,16 @@ void test_pose_input_round_trip() {
           .head = pose(0.0F),
           .left = left,
           .right = right,
+          .device_views = {eye_view(0.031F), eye_view(0.034F)},
       },
   };
-  expect(protocol::deserialize(protocol::serialize(expected)) == expected,
-         "pose/input round trip");
+  const auto bytes = protocol::serialize(expected);
+  expect(bytes.size() == protocol::kHeaderSize + 312, "v3 pose/input payload size");
+  expect(protocol::deserialize(bytes) == expected, "pose/input round trip");
+  auto legacy = bytes;
+  legacy[4] = std::byte{1};
+  expect_protocol_error([&] { (void)protocol::deserialize(legacy); },
+                        "reject v1 peer rather than misreading controller data");
 }
 
 void test_control_round_trip() {

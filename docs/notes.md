@@ -1,5 +1,10 @@
 # 調査・設計メモ
 
+## Local controller-pose investigation
+
+The XRI Starter Assets rig prefers controller pointer rotation. The original link forwards device/grip rotation as pointer rotation too. This is a confirmed implementation limitation and a plausible cause of the reported upward tilt. It is not yet a confirmed explanation of the observed angle. Do not apply an estimated 15-degree correction. Validate the patched client on Quest and compare both hands with the real controllers.
+
+
 ## 2026-07-22 — デモ映像v4の同期画面・端子・カット接続設計
 
 - Imagen生成のUnity Editor UIは外枠、Hierarchy、Inspector、toolbarを保持し、中央viewport (`x=343, y=96, w=944, h=507` on 1672x941 source) だけへ動画を合成する。Play前は生成still、Play後だけ共有XR masterを表示する。

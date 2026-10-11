@@ -21,3 +21,26 @@
 # Submission video sources and captures are maintained outside the public source repository. They
 # contain large generated renders, licensed reference assets, device captures, and local tool paths.
 /demo-video/
+
+# Local controller-pose fix builds.
+/build-controller-fix/
+/build-pose/
+
+/layer/tests/protocol-interop/bin/
+/layer/tests/protocol-interop/obj/
+
+# Local diagnostics, private settings, and generated release experiments.
+/debugging/
+/dist/*.log
+/dist/*.patch
+/dist/DescribeAGame-*
+/dist/room-autoload/
+/dist/*-controller-poses.*
+/dist/*-room-sync.*
+/dist/*-eye-views.*
+/quest-client/Assets/Resources/DevAgentSettings.asset*
+/quest-client/Assets/MetalQuestLink/Editor/BuildRoomAlignmentProbe.cs*
+/quest-client/Assets/MetalQuestLink/Editor/RoomBridgeSmoke.cs*
+/quest-client/Assets/MetalQuestLink/Runtime/RoomAlignmentProbe.cs*
+/quest-client/Assets/MetalQuestLink/Generated/RoomAlignmentProbe.unity*
+/quest-client/Assets/MetalQuestLink/Generated/ProbeLines.mat*

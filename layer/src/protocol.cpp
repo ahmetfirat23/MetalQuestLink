@@ -119,6 +119,7 @@ void write_pose(Writer& writer, const Pose& pose) {
 
 void write_controller(Writer& writer, const ControllerState& controller) {
   write_pose(writer, controller.pose);
+  write_pose(writer, controller.aim_pose);
   writer.write(controller.buttons);
   for (const float value : controller.thumbstick) {
     writer.write(value);
@@ -130,6 +131,7 @@ void write_controller(Writer& writer, const ControllerState& controller) {
 [[nodiscard]] ControllerState read_controller(Reader& reader) {
   ControllerState controller;
   controller.pose = read_pose(reader);
+  controller.aim_pose = read_pose(reader);
   controller.buttons = reader.read<std::uint64_t>();
   for (float& value : controller.thumbstick) {
     value = reader.read<float>();
@@ -210,6 +212,7 @@ void write_hand_joint(Writer& writer, const HandJoint& joint) {
           write_pose(writer, value.head);
           write_controller(writer, value.left);
           write_controller(writer, value.right);
+          for (const auto& view : value.device_views) write_eye_view(writer, view);
         } else if constexpr (std::is_same_v<T, ControlMessage>) {
           writer.write(value.kind);
           writer.write(value.flags);
@@ -271,6 +274,7 @@ void require_no_trailing_bytes(const Reader& reader) {
       value.head = read_pose(reader);
       value.left = read_controller(reader);
       value.right = read_controller(reader);
+      for (auto& view : value.device_views) view = read_eye_view(reader);
       require_no_trailing_bytes(reader);
       return value;
     }

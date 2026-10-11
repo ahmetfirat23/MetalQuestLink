@@ -850,10 +850,25 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_end_frame(XrSession session, const XrFrameEn
           info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ||
           info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE ||
           (projection->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) != 0;
+      std::array<XrCompositionLayerProjectionView, 2> tracking_views{};
+      if (!input_projection_to_tracking_space(projection->space, projection->views,
+                                               tracking_views.data(), 2)) {
+        if (log_layout) log_streaming_line("projection space is unknown; skipping capture");
+        continue;
+      }
+      if (log_layout) {
+        const auto& from = projection->views[0].pose.orientation;
+        const auto& to = tracking_views[0].pose.orientation;
+        log_streaming_line("projection space conversion submittedOrientation=" +
+            std::to_string(from.x) + "," + std::to_string(from.y) + "," +
+            std::to_string(from.z) + "," + std::to_string(from.w) +
+            " trackingOrientation=" + std::to_string(to.x) + "," +
+            std::to_string(to.y) + "," + std::to_string(to.z) + "," + std::to_string(to.w));
+      }
       g_encoder.encode(queue, textures,
                        static_cast<std::uint32_t>(left.imageRect.extent.width),
                        static_cast<std::uint32_t>(left.imageRect.extent.height),
-                       projection->views, capture_timestamp_ns, passthrough, force_keyframe);
+                       tracking_views.data(), capture_timestamp_ns, passthrough, force_keyframe);
       break;
     }
   }

@@ -36,10 +36,11 @@ enum class Component {
   Trigger,
   Grip,
   Thumbstick,
-  Pose,
+  GripPose,
+  AimPose,
   Haptic,
 };
-enum class SpaceSource { Local, Head, LeftController, RightController };
+enum class SpaceSource { Local, Head, LeftController, RightController, LeftAim, RightAim };
 
 struct InstanceData {
   PFN_xrGetInstanceProcAddr gipa{};
@@ -198,8 +199,11 @@ template <typename Function>
   if (path.ends_with("/input/thumbstick")) {
     return Component::Thumbstick;
   }
-  if (path.ends_with("/input/grip/pose") || path.ends_with("/input/aim/pose")) {
-    return Component::Pose;
+  if (path.ends_with("/input/grip/pose")) {
+    return Component::GripPose;
+  }
+  if (path.ends_with("/input/aim/pose")) {
+    return Component::AimPose;
   }
   if (path.ends_with("/output/haptic")) {
     return Component::Haptic;
@@ -281,6 +285,10 @@ template <typename Function>
       return &input.left.pose;
     case SpaceSource::RightController:
       return &input.right.pose;
+    case SpaceSource::LeftAim:
+      return &input.left.aim_pose;
+    case SpaceSource::RightAim:
+      return &input.right.aim_pose;
   }
   return nullptr;
 }
@@ -514,13 +522,16 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_create_action_space(
   const auto next = next_function<PFN_xrCreateActionSpace>(instance, "xrCreateActionSpace");
   const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID : next(session, info, space);
   if (XR_SUCCEEDED(result)) {
+    const auto bindings = bindings_for_action(info->action, info->subactionPath);
+    const auto pose_binding = std::find_if(bindings.begin(), bindings.end(), [](const Binding& binding) {
+      return binding.component == Component::GripPose || binding.component == Component::AimPose;
+    });
     Side side = side_for_path(instance, info->subactionPath);
-    if (side == Side::None) {
-      const auto bindings = bindings_for_action(info->action, XR_NULL_PATH);
-      if (!bindings.empty()) side = bindings.front().side;
-    }
-    const SpaceSource source = side == Side::Right ? SpaceSource::RightController
-                                                    : SpaceSource::LeftController;
+    if (side == Side::None && !bindings.empty()) side = bindings.front().side;
+    const bool aim = pose_binding != bindings.end() && pose_binding->component == Component::AimPose;
+    const SpaceSource source = side == Side::Right
+                                   ? (aim ? SpaceSource::RightAim : SpaceSource::RightController)
+                                   : (aim ? SpaceSource::LeftAim : SpaceSource::LeftController);
     std::scoped_lock lock(g_mutex);
     g_spaces[*space] = SpaceData{instance, session, source, info->poseInActionSpace};
   }
@@ -590,7 +601,6 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_locate_views(
   const auto input = transport_latest_pose_input();
   if (XR_SUCCEEDED(result) && input.has_value() && state != nullptr && count != nullptr &&
       views != nullptr && capacity >= 2 && *count >= 2) {
-    const XrPosef head = xr_pose(input->head);
     SpaceData base;
     {
       std::scoped_lock lock(g_mutex);
@@ -598,20 +608,32 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_locate_views(
       if (found != g_spaces.end()) base = found->second;
     }
     const XrPosef inverse_base = inverse(local_pose(*input, base));
+    constexpr auto required = protocol::PositionValid | protocol::OrientationValid;
+    for (const auto& view : input->device_views) {
+      if ((view.pose.flags & required) != required ||
+          !(view.fov.angle_left < view.fov.angle_right) ||
+          !(view.fov.angle_down < view.fov.angle_up)) {
+        state->viewStateFlags = 0;
+        return result;
+      }
+    }
     for (std::uint32_t eye = 0; eye < 2; ++eye) {
-      const float x = eye == 0 ? -0.032F : 0.032F;
-      const XrPosef eye_offset{.orientation = {.x = 0, .y = 0, .z = 0, .w = 1},
-                               .position = {.x = x, .y = 0, .z = 0}};
-      views[eye].pose = compose(inverse_base, compose(head, eye_offset));
+      const auto& device_view = input->device_views[eye];
+      views[eye].pose = compose(inverse_base, xr_pose(device_view.pose));
+      views[eye].fov = {.angleLeft = device_view.fov.angle_left,
+                       .angleRight = device_view.fov.angle_right,
+                       .angleUp = device_view.fov.angle_up,
+                       .angleDown = device_view.fov.angle_down};
     }
     state->viewStateFlags = 0;
-    if ((input->head.flags & protocol::PositionValid) != 0)
+    const auto eye_flags = input->device_views[0].pose.flags & input->device_views[1].pose.flags;
+    if ((eye_flags & protocol::PositionValid) != 0)
       state->viewStateFlags |= XR_VIEW_STATE_POSITION_VALID_BIT;
-    if ((input->head.flags & protocol::OrientationValid) != 0)
+    if ((eye_flags & protocol::OrientationValid) != 0)
       state->viewStateFlags |= XR_VIEW_STATE_ORIENTATION_VALID_BIT;
-    if ((input->head.flags & protocol::PositionTracked) != 0)
+    if ((eye_flags & protocol::PositionTracked) != 0)
       state->viewStateFlags |= XR_VIEW_STATE_POSITION_TRACKED_BIT;
-    if ((input->head.flags & protocol::OrientationTracked) != 0)
+    if ((eye_flags & protocol::OrientationTracked) != 0)
       state->viewStateFlags |= XR_VIEW_STATE_ORIENTATION_TRACKED_BIT;
   }
   return result;
@@ -899,6 +921,27 @@ void input_unregister_session(XrSession session) {
   std::erase_if(g_vector_states, [session](const auto& item) {
     return std::get<0>(item.first) == session;
   });
+}
+
+bool input_projection_to_tracking_space(
+    XrSpace space, const XrCompositionLayerProjectionView* source,
+    XrCompositionLayerProjectionView* destination, std::uint32_t count) {
+  if (source == nullptr || destination == nullptr) return false;
+  SpaceData base;
+  {
+    std::scoped_lock lock(g_mutex);
+    const auto found = g_spaces.find(space);
+    if (found == g_spaces.end()) return false;
+    base = found->second;
+  }
+  const auto input = transport_latest_pose_input();
+  if (!input.has_value() && base.source != SpaceSource::Local) return false;
+  const XrPosef tracking_from_base = local_pose(input.value_or(protocol::PoseInput{}), base);
+  for (std::uint32_t eye = 0; eye < count; ++eye) {
+    destination[eye] = source[eye];
+    destination[eye].pose = compose(tracking_from_base, source[eye].pose);
+  }
+  return true;
 }
 
 bool input_get_proc_addr(const char* name, PFN_xrVoidFunction* function) {

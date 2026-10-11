@@ -27,6 +27,7 @@ namespace MetalQuestLink.QuestClient
         private long previousSent;
         private double captureToReceiveMs = -1.0;
         private bool presenterErrorLogged;
+        private bool deviceViewsLogged;
 
         private void Awake()
         {
@@ -58,6 +59,22 @@ namespace MetalQuestLink.QuestClient
         {
             // Update follows the Quest display cadence (72/80/90Hz), satisfying the >=60Hz input path.
             var pose = QuestInputSampler.Sample();
+            if (!deviceViewsLogged && (pose.DeviceViews[0].Pose.Flags &
+                (PoseFlags.PositionValid | PoseFlags.OrientationValid)) ==
+                (PoseFlags.PositionValid | PoseFlags.OrientationValid))
+            {
+                deviceViewsLogged = true;
+                var left = pose.DeviceViews[0];
+                var right = pose.DeviceViews[1];
+                var eyeDelta = new Vector3(right.Pose.Position.X - left.Pose.Position.X,
+                    right.Pose.Position.Y - left.Pose.Position.Y, right.Pose.Position.Z - left.Pose.Position.Z);
+                var centerDelta = new Vector3((left.Pose.Position.X + right.Pose.Position.X) * 0.5f - pose.Head.Position.X,
+                    (left.Pose.Position.Y + right.Pose.Position.Y) * 0.5f - pose.Head.Position.Y,
+                    (left.Pose.Position.Z + right.Pose.Position.Z) * 0.5f - pose.Head.Position.Z);
+                Debug.Log($"METALQUESTLINK_DEVICE_VIEWS source=QuestOpenXR eyeSpacingM={eyeDelta.magnitude:F5} " +
+                    $"headCenterDifferenceM={centerDelta.magnitude:F5} leftFov={left.Fov.AngleLeft:F4},{left.Fov.AngleRight:F4}," +
+                    $"{left.Fov.AngleUp:F4},{left.Fov.AngleDown:F4} protocol={Protocol.Version}");
+            }
             latestHands = QuestHandSampler.Sample(pose.SampleTimestampNs);
             transport.SubmitLatestHands(latestHands);
             handVisualizer?.UpdateHands(latestHands);

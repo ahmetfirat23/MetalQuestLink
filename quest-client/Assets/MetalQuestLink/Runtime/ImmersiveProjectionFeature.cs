@@ -29,6 +29,39 @@ namespace MetalQuestLink.QuestClient
         private bool sessionReady;
 
         public static bool IsAvailable => current != null && current.enabled && current.sessionReady;
+        private static readonly NativeStreamView[] deviceViews = new NativeStreamView[2];
+
+        public static bool TryGetDeviceViews(EyeView[] output)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!IsAvailable || output == null || output.Length != 2) return false;
+            uint nativeFlags = NativeGetDeviceViews(deviceViews, 2);
+            // OpenXR's view-state bits have a different order from our wire pose bits.
+            PoseFlags flags = 0;
+            if ((nativeFlags & 1) != 0) flags |= PoseFlags.OrientationValid;
+            if ((nativeFlags & 2) != 0) flags |= PoseFlags.PositionValid;
+            if ((nativeFlags & 4) != 0) flags |= PoseFlags.OrientationTracked;
+            if ((nativeFlags & 8) != 0) flags |= PoseFlags.PositionTracked;
+            for (int eye = 0; eye < 2; eye++)
+            {
+                var view = deviceViews[eye];
+                output[eye] = new EyeView {
+                    Pose = new PoseState {
+                        Position = new Vector3f { X = view.PositionX, Y = view.PositionY, Z = view.PositionZ },
+                        Orientation = new Quaternionf { X = view.OrientationX, Y = view.OrientationY,
+                            Z = view.OrientationZ, W = view.OrientationW }, Flags = flags },
+                    Fov = new FieldOfView { AngleLeft = view.AngleLeft, AngleRight = view.AngleRight,
+                        AngleUp = view.AngleUp, AngleDown = view.AngleDown } };
+            }
+            return (flags & (PoseFlags.PositionValid | PoseFlags.OrientationValid)) ==
+                (PoseFlags.PositionValid | PoseFlags.OrientationValid);
+#else
+            return false;
+#endif
+        }
+
+        [DllImport(NativeLibrary, EntryPoint = "metalquestlink_projection_get_device_views")]
+        private static extern uint NativeGetDeviceViews([Out] NativeStreamView[] views, uint capacity);
 
         protected override IntPtr HookGetInstanceProcAddr(IntPtr function)
         {

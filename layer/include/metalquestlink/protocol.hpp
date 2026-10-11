@@ -11,7 +11,7 @@
 namespace metalquestlink::protocol {
 
 inline constexpr std::uint32_t kMagic = 0x4b4c544d;  // "MTLK" on the wire.
-inline constexpr std::uint16_t kProtocolVersion = 1;
+inline constexpr std::uint16_t kProtocolVersion = 3;
 inline constexpr std::size_t kHeaderSize = 20;
 inline constexpr std::uint32_t kMaxPayloadSize = 64U * 1024U * 1024U;
 
@@ -86,7 +86,8 @@ struct Pose {
 };
 
 struct ControllerState {
-  Pose pose{};
+  Pose pose{};  // OpenXR grip pose.
+  Pose aim_pose{};
   std::uint64_t buttons{};
   std::array<float, 2> thumbstick{};
   float trigger{};
@@ -129,6 +130,7 @@ struct PoseInput {
   Pose head{};
   ControllerState left{};
   ControllerState right{};
+  std::array<EyeView, 2> device_views{};
 
   bool operator==(const PoseInput&) const = default;
 };

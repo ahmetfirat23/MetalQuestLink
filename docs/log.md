@@ -1,5 +1,10 @@
 # 変更履歴
 
+## 2026-10-11: Local controller grip/aim patch
+
+Traced the Quest sampler reading only device/grip pose and the Mac layer mapping both grip and aim bindings to that pose. Added separate aim sampling, protocol v2 transport, and binding-based action-space routing. Native protocol and controller routing tests passed. C#/C++ interoperability and simulator input/streaming checks also passed. The local native test build used bundled JsonCpp to avoid the installed Homebrew target mapping issue and needed its OpenXR loader rpath added to the test executable. Unity 6.3.24f1 Android build succeeded; 12/12 Unity EditMode tests passed. Generated matching signed Mac package / Quest APK and verified checksums. Headset alignment remains untested; the installed link and game are unchanged. Full verification and installation constraints are recorded in `controller-pose-fix.md`.
+
+
 ## 2026-07-22 — Build Weekデモ映像 v5最終監査版
 
 - 映像、CG、カメラ、モーショングラフィクスのタイムラインは固定し、ナレーションを23個のshot-sized cueへ再編集した。各発話を対象カット到着後に開始し、関係のない次カットへ跨がない順序へ変更した。字幕JSONは実音声と同じ配置を使用する。

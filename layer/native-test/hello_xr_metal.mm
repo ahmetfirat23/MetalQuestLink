@@ -223,8 +223,9 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
   ++test.input_samples;
   if (views.size() >= 2 &&
       (!test.synthetic ||
-       (near((views[0].pose.position.x + views[1].pose.position.x) * 0.5F, 1.0F) &&
-        near(views[0].pose.position.y, 2.0F) && near(views[0].pose.position.z, 3.0F)))) {
+       (near(views[0].pose.position.x, 0.970F) && near(views[1].pose.position.x, 1.035F) &&
+        near(views[0].pose.position.y, 2.0F) && near(views[0].pose.position.z, 3.0F) &&
+        near(views[0].fov.angleLeft, -0.9F) && near(views[1].fov.angleRight, 0.9F)))) {
     test.views_verified = true;
   }
 

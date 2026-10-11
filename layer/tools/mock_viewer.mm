@@ -124,15 +124,26 @@ void send_synthetic_input(std::stop_token stop, int socket_fd,
             .sample_timestamp_ns = monotonic_now_ns(),
             .head = synthetic_pose(1.0F, 2.0F, 3.0F),
             .left = {.pose = synthetic_pose(-0.25F, 1.25F, -0.5F),
+                     .aim_pose = synthetic_pose(-0.25F, 1.25F, -0.5F),
                      .buttons = protocol::PrimaryButton | protocol::ThumbstickButton,
                      .thumbstick = {0.25F, -0.5F},
                      .trigger = 0.75F,
                      .grip = 0.5F},
             .right = {.pose = synthetic_pose(0.25F, 1.25F, -0.5F),
+                      .aim_pose = synthetic_pose(0.25F, 1.25F, -0.5F),
                       .buttons = protocol::SecondaryButton,
                       .thumbstick = {-0.25F, 0.5F},
                       .trigger = 0.25F,
                       .grip = 1.0F},
+            // Synthetic views belong to this test viewer only, never the Quest client.
+            .device_views = {{
+                {.pose = synthetic_pose(0.970F, 2.0F, 3.0F),
+                 .fov = {.angle_left = -0.9F, .angle_right = 0.7F,
+                         .angle_up = 0.8F, .angle_down = -0.85F}},
+                {.pose = synthetic_pose(1.035F, 2.0F, 3.0F),
+                 .fov = {.angle_left = -0.7F, .angle_right = 0.9F,
+                         .angle_up = 0.8F, .angle_down = -0.85F}}
+            }},
         },
     };
     const auto bytes = protocol::serialize(message);

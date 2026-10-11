@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace MetalQuestLink.Editor
 {
@@ -28,6 +29,34 @@ namespace MetalQuestLink.Editor
         {
             var port = MetalQuestLinkSettings.instance.port;
             return Run(BuildDeviceArguments($"reverse tcp:{port} tcp:{port}"));
+        }
+
+        internal static AdbResult ExportRoom(string requestId)
+        {
+            if (!Guid.TryParseExact(requestId, "N", out _)) throw new ArgumentException("Invalid room request ID");
+            var reverse = Reverse();
+            if (!reverse.Success) return reverse;
+            return Run(BuildDeviceArguments(BuildStartClientArguments() +
+                " --es metalquestlink_export_room " + requestId), 60000);
+        }
+
+        internal static Task<AdbResult> PullRoomFileAsync(string requestId, string extension, string destination)
+        {
+            if (!Guid.TryParseExact(requestId, "N", out _) || (extension != "json" && extension != "status"))
+                throw new ArgumentException("Invalid room snapshot path");
+            var path = $"/sdcard/Android/data/{PackageName}/files/MetalQuestLink/{requestId}.{extension}";
+            var adb = FindAdb();
+            var arguments = BuildDeviceArguments($"pull {Quote(path)} {Quote(destination)}");
+            return Task.Run(() => RunWithExecutable(adb, arguments, 10000));
+        }
+
+        internal static Task RemoveRoomFilesAsync(string requestId)
+        {
+            if (!Guid.TryParseExact(requestId, "N", out _)) return Task.CompletedTask;
+            var path = $"/sdcard/Android/data/{PackageName}/files/MetalQuestLink/{requestId}";
+            var adb = FindAdb();
+            var arguments = BuildDeviceArguments($"shell rm -f {path}.json {path}.status");
+            return Task.Run(() => RunWithExecutable(adb, arguments, 10000));
         }
 
         public static AdbResult Install()
@@ -67,7 +96,7 @@ namespace MetalQuestLink.Editor
                 var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = adb,
-                    Arguments = BuildDeviceArguments(BuildStartClientArguments()),
+                    Arguments = BuildDeviceArguments(BuildStartClientArguments(restart: !IsClientRunning())),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 });
@@ -82,10 +111,26 @@ namespace MetalQuestLink.Editor
             }
         }
 
-        public static string BuildStartClientArguments()
+        internal static bool IsClientRunning()
+        {
+            var result = Run(BuildDeviceArguments("shell pidof " + PackageName));
+            return result.Success && !string.IsNullOrWhiteSpace(result.Output);
+        }
+
+        internal static string ClientSessionId()
+        {
+            var serial = Run(BuildDeviceArguments("get-serialno"));
+            var boot = Run(BuildDeviceArguments("shell cat /proc/sys/kernel/random/boot_id"));
+            var pid = Run(BuildDeviceArguments("shell pidof " + PackageName));
+            if (!serial.Success || !boot.Success || !pid.Success || string.IsNullOrWhiteSpace(pid.Output))
+                return null;
+            return serial.Output.Trim() + ":" + boot.Output.Trim() + ":" + pid.Output.Trim();
+        }
+
+        public static string BuildStartClientArguments(bool restart = true)
         {
             var settings = MetalQuestLinkSettings.instance;
-            var arguments = $"shell am start -S -n {PackageName}/{ActivityName} " +
+            var arguments = $"shell am start {(restart ? "-S " : "")}-n {PackageName}/{ActivityName} " +
                    $"--ei metalquestlink_port {settings.port} " +
                    $"--ez metalquestlink_passthrough {BooleanArgument(settings.enablePassthroughPreview)} " +
                    $"--ez metalquestlink_hand_visualization {BooleanArgument(settings.showTrackedHands)}";

@@ -14,6 +14,7 @@ namespace MetalQuestLink.Editor
         public int bitrateMbps;
         public int maxPendingFrames = 2;
         public bool autoStartQuestClient = true;
+        public bool autoLoadRoomSnapshot = true;
         public bool autoConfigureStandaloneOpenXR = true;
         public bool enablePassthroughPreview = true;
         public bool showTrackedHands = true;

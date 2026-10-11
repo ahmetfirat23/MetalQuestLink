@@ -366,7 +366,8 @@ scripts/e2e_device.sh
 - projection layerはMac描画時の左右眼pose/FOVを使うcompositor再投影です。depth-aware / spacewarpではありません。
 - Metal以外のgraphics API、2D / 2D-array以外のtexture、上記対応表にないpixel formatは配信対象外です。
 - Play中にeye texture解像度またはcodecが変わる動的切替には未対応です。render scaleはPlay開始前に決めてください。
-- protocol v1のcontroller poseはgrip/aimで共通、IPDはMac側注入時に64 mm固定です。
+- このローカル修正版はgrip/aim poseを個別に転送します。protocol v2を使うため、修正版Mac packageとQuest APKを必ず組み合わせて導入してください。v1/v2の混在接続は拒否されます。
+- IPDはMac側注入時に64 mm固定です。
 - clock offsetはPing/Pongの往復対称性を仮定する近似で、光学測定の代替ではありません。
 - Meta XR Simulator v201はprocess終了時にvendor gRPC destructorが待機する場合があります。native testだけは
   OpenXR resource破棄後にvendor static destructorを迂回します。

@@ -1,6 +1,6 @@
 {
   "name": "com.metalquestlink.editor",
-  "version": "0.2.0",
+  "version": "0.2.3-eye-views.1",
   "displayName": "MetalQuestLink Editor",
   "description": "Version-tolerant Editor setup and diagnostics for streaming Meta XR Simulator play mode to Quest.",
   "unity": "2022.3",
